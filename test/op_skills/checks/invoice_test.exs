@@ -194,6 +194,35 @@ defmodule OpSkills.Checks.InvoiceTest do
     assert message =~ "Duplicate part lines"
   end
 
+  test "matches a part line that includes the part number and quantity" do
+    input =
+      valid_input()
+      |> change([:invoice_draft, :line_items], [
+        %{kind: :labor, description: "Labor", amount_cents: 24_000},
+        %{kind: :part, description: "Bearing 6204, qty 2", amount_cents: 17_300}
+      ])
+
+    result = Invoice.run(input)
+    assert result.passed
+    assert status_for(result, "parts_coverage") |> elem(0) == :pass
+  end
+
+  test "flags duplicate part lines when both descriptions match the same work-order part" do
+    input =
+      valid_input()
+      |> change([:invoice_draft, :line_items], [
+        %{kind: :labor, description: "Labor", amount_cents: 12_000},
+        %{kind: :parts, description: "Bearing 6204", amount_cents: 17_300},
+        %{kind: :parts, description: "Bearing 6204, qty 2", amount_cents: 17_300}
+      ])
+      |> change([:invoice_draft, :total_cents], 46_600)
+
+    {status, message} = status_for(Invoice.run(input), "parts_coverage")
+
+    assert status == :fail
+    assert message =~ "Duplicate part lines"
+  end
+
   test "flags a placeholder QBO invoice" do
     input =
       change(valid_input(), [:existing_invoice], %{

@@ -244,18 +244,31 @@ defmodule OpSkills.Checks.Invoice do
     invoice_parts =
       for item <- items, part_line?(item), name = item_name(item), do: normalize(name)
 
-    duplicates = invoice_parts -- Enum.uniq(invoice_parts)
-    unknown = Enum.reject(Enum.uniq(invoice_parts), &(&1 in work_order_parts(work_order)))
+    known = work_order_parts(work_order) |> MapSet.to_list()
+    matches = Enum.map(invoice_parts, fn line -> {line, match_part(line, known)} end)
+
+    unknown =
+      matches
+      |> Enum.filter(fn {_line, match} -> is_nil(match) end)
+      |> Enum.map(fn {line, _} -> line end)
+      |> Enum.uniq()
+
+    duplicate_names =
+      matches
+      |> Enum.reject(fn {_line, match} -> is_nil(match) end)
+      |> Enum.group_by(fn {_line, match} -> match end)
+      |> Enum.filter(fn {_match, lines} -> length(lines) > 1 end)
+      |> Enum.map(fn {match, _} -> match end)
 
     cond do
       invoice_parts == [] ->
         check("parts_coverage", :pass, "No parts billed.")
 
-      duplicates != [] ->
+      duplicate_names != [] ->
         check(
           "parts_coverage",
           :fail,
-          "Duplicate part lines on the invoice: #{Enum.join(Enum.uniq(duplicates), ", ")}."
+          "Duplicate part lines on the invoice: #{Enum.join(duplicate_names, ", ")}."
         )
 
       unknown != [] ->
@@ -272,6 +285,16 @@ defmodule OpSkills.Checks.Invoice do
           "All #{length(invoice_parts)} part line(s) appear in the work order."
         )
     end
+  end
+
+  # A model may describe a part as "Oil filter LF-3504, qty 1" while the work order
+  # stores "Oil filter". Match the longest known name contained in the line.
+  defp match_part(_line, []), do: nil
+
+  defp match_part(line, known) do
+    known
+    |> Enum.sort_by(&String.length/1, :desc)
+    |> Enum.find(&String.contains?(line, &1))
   end
 
   defp work_order_parts(work_order) do
