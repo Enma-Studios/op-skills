@@ -30,9 +30,7 @@ defmodule OpSkills.Tools.InvoiceChecks do
       "properties" => %{
         "work_order" => %{"type" => "object"},
         "invoice_draft" => %{"type" => "object"},
-        "existing_invoice" => %{
-          "type" => %{"oneOf" => [%{"type" => "object"}, %{"type" => "null"}]}
-        }
+        "existing_invoice" => %{"oneOf" => [%{"type" => "object"}, %{"type" => "null"}]}
       }
     }
   end

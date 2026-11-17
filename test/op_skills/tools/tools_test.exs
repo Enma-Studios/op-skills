@@ -78,6 +78,31 @@ defmodule OpSkills.Tools.InvoiceChecksTest do
     assert InvoiceChecks.schema()["required"] == ["work_order", "invoice_draft"]
   end
 
+  test "schema is well-formed: no nested map under \"type\"" do
+    schema = InvoiceChecks.schema()
+    assert schema["type"] == "object"
+    assert is_map(schema["properties"])
+    refute Map.has_key?(schema["properties"]["existing_invoice"], "type")
+
+    assert schema["properties"]["existing_invoice"]["oneOf"] == [
+             %{"type" => "object"},
+             %{"type" => "null"}
+           ]
+
+    # Every "type" value anywhere in the schema must be a JSON Schema type name.
+    for %{"type" => type} <- all_schemas(schema) do
+      assert is_binary(type) and
+               type in ["object", "null", "string", "number", "boolean", "array"]
+    end
+  end
+
+  defp all_schemas(schema) when is_map(schema) do
+    [schema | Enum.flat_map(Map.values(schema), &all_schemas/1)]
+  end
+
+  defp all_schemas(list) when is_list(list), do: Enum.flat_map(list, &all_schemas/1)
+  defp all_schemas(_other), do: []
+
   test "runs the checks and reports failures inside {:ok, _}" do
     assert {:ok, result} = InvoiceChecks.run(%{}, TestHost)
     refute result.passed
