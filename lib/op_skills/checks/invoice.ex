@@ -34,7 +34,8 @@ defmodule OpSkills.Checks.Invoice do
           po_number: "PO-3311"                         # optional
         },
         existing_invoice: nil
-        # or %{qbo_id: "QBO-771", status: "draft", work_order_id: "WO-1042"}
+        # or %{qbo_id: "QBO-771", status: "draft", work_order_id: "WO-1042",
+        #     system_owned: false}
       }
 
   ## Result
@@ -48,6 +49,15 @@ defmodule OpSkills.Checks.Invoice do
 
   `passed` is false when any check fails; warnings surface in `issues` but do
   not block. All money is integer cents — floats are rejected.
+
+  ## Existing QuickBooks invoices
+
+  Operately's system-owned invoice for the same work order is **updated,
+  never duplicated**: `existing_invoice` with `system_owned: true` and a
+  matching `work_order_id` passes (a placeholder still warns that its
+  contents will be replaced). Without the flag, any active invoice for the
+  work order is a duplicate failure, and a placeholder must be replaced by a
+  human before billing.
   """
 
   @type status :: :pass | :fail | :warning
@@ -292,17 +302,33 @@ defmodule OpSkills.Checks.Invoice do
         qbo_id = fetch(existing, :qbo_id) || fetch(existing, :id) || "unknown"
         status = status_string(fetch(existing, :status))
         wo_id = fetch(work_order, :id)
+        system_owned? = fetch(existing, :system_owned) == true
+        same_work_order? = wo_id != nil and fetch(existing, :work_order_id) == wo_id
+        active? = status not in ~w(void cancelled deleted)
 
         cond do
-          status == "placeholder" ->
+          status == "placeholder" and not system_owned? ->
             check(
               "qbo_invoice_state",
               :fail,
-              "Placeholder QuickBooks invoice (#{qbo_id}) exists — replace it instead of creating a duplicate."
+              "Placeholder QuickBooks invoice (#{qbo_id}) exists — it must be replaced, not duplicated."
             )
 
-          wo_id != nil and fetch(existing, :work_order_id) == wo_id and
-              status not in ~w(void cancelled deleted) ->
+          status == "placeholder" ->
+            check(
+              "qbo_invoice_state",
+              :warning,
+              "System-owned placeholder QuickBooks invoice (#{qbo_id}) exists — the approved draft replaces its contents, never duplicates it."
+            )
+
+          same_work_order? and active? and system_owned? ->
+            check(
+              "qbo_invoice_state",
+              :pass,
+              "The approved draft updates the system-owned QuickBooks invoice #{qbo_id} for work order #{wo_id} — it will not be duplicated."
+            )
+
+          same_work_order? and active? ->
             check(
               "qbo_invoice_state",
               :fail,

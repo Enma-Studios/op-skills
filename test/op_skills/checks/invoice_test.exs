@@ -209,6 +209,25 @@ defmodule OpSkills.Checks.InvoiceTest do
     assert message =~ "QBO-771"
   end
 
+  test "a system-owned placeholder warns that the draft replaces it" do
+    input =
+      change(valid_input(), [:existing_invoice], %{
+        qbo_id: "QBO-771",
+        status: "placeholder",
+        work_order_id: "WO-1042",
+        system_owned: true
+      })
+
+    result = Invoice.run(input)
+    {status, message} = status_for(result, "qbo_invoice_state")
+
+    assert status == :warning
+    assert message =~ "replaces its contents"
+    assert message =~ "never duplicates"
+    assert result.passed
+    assert Enum.any?(result.issues, &(&1 =~ "placeholder"))
+  end
+
   test "flags an existing QBO invoice for the same work order" do
     input =
       change(valid_input(), [:existing_invoice], %{
@@ -221,6 +240,38 @@ defmodule OpSkills.Checks.InvoiceTest do
 
     assert status == :fail
     assert message =~ "already exists"
+  end
+
+  test "passes a system-owned QBO invoice for the same work order as an update" do
+    input =
+      change(valid_input(), [:existing_invoice], %{
+        qbo_id: "QBO-772",
+        status: "draft",
+        work_order_id: "WO-1042",
+        system_owned: true
+      })
+
+    result = Invoice.run(input)
+    {status, message} = status_for(result, "qbo_invoice_state")
+
+    assert status == :pass
+    assert message =~ "updates"
+    assert message =~ "not be duplicated"
+    assert result.passed
+  end
+
+  test "system_owned: false still fails as a duplicate" do
+    input =
+      change(valid_input(), [:existing_invoice], %{
+        qbo_id: "QBO-772",
+        status: "draft",
+        work_order_id: "WO-1042",
+        system_owned: false
+      })
+
+    {status, _message} = status_for(Invoice.run(input), "qbo_invoice_state")
+
+    assert status == :fail
   end
 
   test "ignores a QBO invoice for a different work order" do

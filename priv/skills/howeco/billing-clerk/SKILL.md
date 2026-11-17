@@ -38,7 +38,10 @@ Run `invoice_checks` on the draft. It verifies:
 - labor hours equal the sum of the work order time entries
 - every part on the invoice exists in the work order checklist/parts, with no
   duplicate part lines
-- no placeholder or duplicate QuickBooks invoice exists for this work order
+- no duplicate QuickBooks invoice for this work order. A system-owned invoice
+  is updated, never duplicated; a placeholder invoice must be replaced by a
+  human unless it is system-owned, in which case the approved draft replaces
+  its contents
 - missing receipts or POs are flagged, not hidden
 - bill-to matches the customer billing entity on the work order
 
