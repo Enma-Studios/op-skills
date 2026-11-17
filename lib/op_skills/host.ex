@@ -13,10 +13,21 @@ defmodule OpSkills.Host do
   @typedoc "Opaque identifier of a pending approval, returned by the host."
   @type approval_ref :: String.t()
 
-  @typedoc "Description of an outbound HTTP/API call the host should execute."
+  @typedoc """
+  Description of an outbound call the host should execute against one of its
+  allowlisted integrations.
+
+  `:system` names the integration (for example `"quickbooks"`), and
+  `:company_id` / `:connection_id` scope it to the tenant's stored
+  connection. The host only executes requests against systems it allowlists
+  and connections it owns — never arbitrary URLs.
+  """
   @type request_descriptor :: %{
           required(:method) => String.t(),
           required(:url) => String.t(),
+          optional(:system) => String.t(),
+          optional(:company_id) => String.t(),
+          optional(:connection_id) => String.t(),
           optional(:headers) => map(),
           optional(:body) => map() | String.t()
         }
@@ -37,8 +48,11 @@ defmodule OpSkills.Host do
   @callback fetch_secret(key :: String.t()) :: {:ok, String.t()} | {:error, term()}
 
   @doc """
-  Executes the HTTP/API call described by `descriptor` with the host's own
-  authentication, returning the decoded response or `{:error, reason}`.
+  Executes the call described by `descriptor` with the host's own
+  authentication. The host resolves `:system`, `:company_id`, and
+  `:connection_id` to its own allowlisted, stored connection — it never
+  executes arbitrary URLs. Returns the decoded response or
+  `{:error, reason}`.
   """
   @callback request(descriptor :: request_descriptor()) :: {:ok, map() | :ok} | {:error, term()}
 
