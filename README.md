@@ -25,7 +25,7 @@ Path dependency for local development (from the Operately repo):
 Git dependency for production:
 
 ```elixir
-{:op_skills, git: "https://github.com/howeco/op-skills.git", branch: "main"}
+{:op_skills, git: "https://github.com/Enma-Studios/op-skills.git", branch: "dev"}
 ```
 
 Then `mix deps.get`.
