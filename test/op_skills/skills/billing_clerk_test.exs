@@ -5,6 +5,11 @@ defmodule OpSkills.Skills.BillingClerkTest do
   alias OpSkills.Skills.BillingClerk
 
   test "resolves through the Jido skill API and stays consistent with the manifest" do
+    # Jido.AI.Skill.resolve/1 checks function_exported?/3, which does not
+    # auto-load the module; after a recompile purge the module may not be
+    # loaded yet, so load it explicitly first.
+    Code.ensure_loaded!(BillingClerk)
+
     assert {:ok, spec} = Jido.AI.Skill.resolve(BillingClerk)
     assert spec.name == Manifest.billing_clerk().id
     assert spec.description == Manifest.billing_clerk().summary
