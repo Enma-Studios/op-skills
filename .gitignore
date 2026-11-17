@@ -1,0 +1,7 @@
+_build/
+deps/
+.env
+*.keys
+priv/demo/
+tmp/
+.elixir_ls/
